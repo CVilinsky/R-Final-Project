@@ -71,16 +71,17 @@ replaceCommas<-function(x){
   x<-as.numeric(gsub("\\,", "", x))
 }
 
-#filter to get the dates we want to work on
-filtered_summ <- summmarised_stats[12:52,]
-#iterate the columns, and remove the commas for the values and turn the columns to numeric
-for (i in 2:ncol(filtered_summ)){filtered_summ[,i] <- replaceCommas(filtered_summ[,i])
-filtered_summ[,i] <- as.numeric(filtered_summ[,i])}
+for (i in 2:ncol(summmarised_stats)){summmarised_stats[,i] <- replaceCommas(summmarised_stats[,i])
+summmarised_stats[,i] <- as.numeric(summmarised_stats[,i])}
+
+write.csv(summmarised_stats,"summarised_stats.csv")
+
 
 civiqs_poll_data$summed <- civiqs_poll_data$dem+civiqs_poll_data$rep
 colnames(civiqs_poll_data)[1] <- "Date"
 civiqs_poll_data$Date <- as.Date(civiqs_poll_data$Date,format="%m/%d/%Y")
 
+write.csv(civiqs_poll_data, "poll_with_sum.csv")
 #plots active vs voters
 
 plot_active_cases_dates <- ggplot(filtered_summ,mapping = aes(x=Date,y=Active))+labs(title='Active Case',subtitle = 'In the begining of the pandamic')+geom_line()+scale_y_continuous(trans=log2_trans(), breaks = trans_breaks("log2", function(x) 2^x),
@@ -92,6 +93,7 @@ grid.arrange(plot_active_cases_dates,plot_polls_dates,top=textGrob("The effect o
 for (i in 2:ncol(summmarised_stats)){summmarised_stats[,i] <- replaceCommas(summmarised_stats[,i])
 summmarised_stats[,i] <- as.numeric(summmarised_stats[,i])}
 
+write.csv(summmarised_stats,"summarised_stats.csv")
 
 #ggplot(summmarised_stats%>% filter(Date>=as.Date('2020-10-01')&Date<=as.Date('2020-11-30')),aes(x=Date,y=Active))+geom_line()
 
