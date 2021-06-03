@@ -74,6 +74,8 @@ get_party <- function(x){
   df_governors$party[row_num]
 } #given a state code, receive the party it's connected to
 
+
+
 # separate into sentences
 trump_tweet_data_sentences <- trump_tweet_data %>%
   unnest_tokens(sentence, text, token = "sentences")
