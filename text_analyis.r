@@ -26,123 +26,69 @@ library(grid)
 # first we load the data, using the read functions
 
 civiqs_poll_data <- read.csv("civiqs_poll.csv")
-trump_tweet_data <- readRDS("trump.rds")
-
-paths_allowed("https://en.wikipedia.org/wiki/Template:COVID-19_pandemic_data/United_States_medical_cases")
-
-page <- read_html("https://en.wikipedia.org/wiki/Template:COVID-19_pandemic_data/United_States_medical_cases")
-
-table_wiki <- page %>%
-  html_node("table.wikitable") %>%
-  html_table(fill = TRUE)
-
-
-df_wiki <- as.data.frame((table_wiki))
-
-#save the DF so we won't load it again and again
-
-write.csv(df_wiki,"C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/Final/df_wiki.csv")
-
-#ONLY DO THIS!!!!!!!!!!!! DON'T USE THE ABOVE!!!!
-df_wiki <- read.csv("df_wiki.csv")
-df_wiki <- df_wiki[,2:ncol(df_wiki)]
-for (i in 1:ncol(df_wiki)){names(df_wiki)[i] <- df_wiki[1,i]}
-df_wiki <- df_wiki[2:nrow(df_wiki),]
-
-total_df_wiki <- df_wiki[486,2:ncol(df_wiki)] #create a small table with the totals in it.
-df_wiki_advance <- df_wiki[-c(485:488),] #remove the last 4 rows which don't help us
-
-df_wiki_filtered <-df_wiki_advance[!(df_wiki_advance$Date=="Date"),] #remove rows from the middle of the table
-
-trump_tweet_data_1 <- gsub('.{9}$','',trump_tweet_data$date)
-trump_tweet_data$date <- as.Date(trump_tweet_data_1, format = "%Y-%m-%d")
-
-original_twitts <- trump_tweet_data%>% filter(isRetweet=="FALSE")
-original_twitts <- original_twitts[order(original_twitts$date),] 
-#change the titles to fit our work
-names(df_wiki_filtered)[58] <- "Confirmed_daily"
-names(df_wiki_filtered)[59] <- "Confirmed_total"
-names(df_wiki_filtered)[60] <- "Death_daily"
-names(df_wiki_filtered)[61] <- "Death_total"
-names(df_wiki_filtered)[62] <- "Recovered_daily"
-names(df_wiki_filtered)[63] <- "Recovered_total"
-names(df_wiki_filtered)[64] <- "Active"
-
-summmarised_stats <- df_wiki_filtered%>% select(tail(names(.),8))
-#total_summarised_stats <- df_wiki[486:487,]
-#summmarised_stats <- summmarised_stats[-1,]
-summmarised_stats$Date <- dmy(summmarised_stats$Date)
-#fill the empty cells with '0'
-summmarised_stats[summmarised_stats==''] <- 0
-
-df_wiki_filtered <- df_wiki_filtered[1:(length(df_wiki_filtered)-8)]
-
-#function to replace the commas
-replaceCommas<-function(x){
-  x<-as.numeric(gsub("\\,", "", x))
-}
-
-#filter to get the dates we want to work on
-filtered_summ <- summmarised_stats[12:52,]
-#iterate the columns, and remove the commas for the values and turn the columns to numeric
-for (i in 2:ncol(filtered_summ)){filtered_summ[,i] <- replaceCommas(filtered_summ[,i])
-filtered_summ[,i] <- as.numeric(filtered_summ[,i])}
-
-civiqs_poll_data$summed <- civiqs_poll_data$dem+civiqs_poll_data$rep
 colnames(civiqs_poll_data)[1] <- "Date"
-civiqs_poll_data$Date <- as.Date(civiqs_poll_data$Date,format="%m/%d/%Y")
+civiqs_poll_data$Date <-as.Date(civiqs_poll_data$Date,format="%m/%d/%y")
 
-#plots active vs voters
-
-plot_active_cases_dates <- ggplot(filtered_summ,mapping = aes(x=Date,y=Active))+labs(title='Active Case',subtitle = 'In the begining of the pandamic')+geom_line()+scale_y_continuous(trans=log2_trans(), breaks = trans_breaks("log2", function(x) 2^x),
-                                                                                                                                                                                      labels = trans_format("log2", math_format(2^.x)))
-plot_polls_dates <- ggplot(civiqs_poll_data,aes(x=Date,y=summed))+geom_line()+labs(title='Concern Level',y='Level',x='Date')
-grid.arrange(plot_active_cases_dates,plot_polls_dates,top=textGrob("The effect of active cases on the concern of the citizens",gp=gpar(fontsize=15,font=2)))
-
-#iterate the columns, and remove the commas for the values and turn the columns to numeric
-for (i in 2:ncol(summmarised_stats)){summmarised_stats[,i] <- replaceCommas(summmarised_stats[,i])
-summmarised_stats[,i] <- as.numeric(summmarised_stats[,i])}
-
-
-#ggplot(summmarised_stats%>% filter(Date>=as.Date('2020-10-01')&Date<=as.Date('2020-11-30')),aes(x=Date,y=Active))+geom_line()
-
-df_wiki_filtered[df_wiki_filtered==''] <- 0
-
-
-print(df_wiki_filtered[17,5])
-
-
-
-
-#load the data
 trump_tweet_data <- readRDS("trump.rds") %>%
   rownames_to_column(var = "speech_id")
+colnames(trump_tweet_data)[2] <- "Date"
+trump_tweet_data$Date<-substr(trump_tweet_data$Date,1,10)
+trump_tweet_data$Date<- as.Date(trump_tweet_data$Date)
+
+df_wiki_filtered <- read.csv("df_wiki_numeric.csv")
+summmarised_stats <- read.csv("summarised_stats.csv") 
+
+
+
+# create table of tweet and civiqs_poll
+
+
+civiqs_poll_and_tweets <-
+  merge(trump_tweet_data,civiqs_poll_data,by = "Date")
+
+#civiqs_poll_data["text"] <- " "
+
+for (i in nrow(civiqs_poll_data)){
+  temp_long_tweet <- " "
+  temp_date <- civiqs_poll_data$Date[i]
+  temp_vec <- grepl(temp_date, trump_tweet_data$Date)
+  start_index <- (which(temp_vec==TRUE))
+  j=start_index
+  if (length(j)==0)
+    break
+  while(trump_tweet_data$Date[j]==temp_date)
+  {
+    temp_long_tweet <- paste(temp_long_tweet,
+      trump_tweet_data$text[j])
+    j <- j+1
+    print(temp_long_tweet)
+  }
+  civiqs_poll_data$text[i] <-temp_long_tweet 
+}
+ 
 
 
 
 
 
-new_date <- as.Date("26-Jan-20","%d-%b-%y")
-print(new_date)
-
-df_wiki_filtered_temp <- df_wiki_filtered
-df_wiki_filtered_temp$Date
-df_wiki_filtered_temp$Date <-as.Date(df_wiki_filtered_temp$Date,format="%d-%b-%y")
-df_wiki_filtered_temp$Date
-colnames(trump_tweet_data)[1] <- "Date"
 
 
+
+ 
+
+# add number of tweet for the wiki
 tweet_and_wiki <- merge(df_wiki_filtered_temp,trump_tweet_data,by = "Date")
 tweet_and_wiki_by_date <- tweet_and_wiki %>%
   group_by(Date)%>%
   summarise(number_of_tweets =n())
 
+
+# switch col and row in the wiki
 df_wiki_filtered_temp_change_row_col <- as.data.frame(t(df_wiki_filtered_temp))
 
 
-# the number of tweets in every date 
+# the number of tweets in every date in the summarise 
 tweet_and_summmarised_stats <- merge(summmarised_stats,trump_tweet_data,by = "Date")
-
 tweet_and_summmarised_stats_by_date <- tweet_and_summmarised_stats %>%
   group_by(Date)%>%
   summarise(number_of_tweets =n())
