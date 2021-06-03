@@ -101,6 +101,12 @@ df_governors <- read.csv("us-governors.csv")
 df_governors <- df_governors %>% select(state_name,state_code,party)
 
 
+get_party <- function(x){
+  temp_vec <- grepl(x,df_governors$state_code)
+  row_num <- min(which(temp_vec==T))
+  df_governors$party[row_num]
+} #given a state code, receive the party it's connected to
+
 civiqs_poll_data_sentences <- civiqs_poll_data %>% 
   select(Date,rep,dem,rep_group,text) %>%
   unnest_tokens(sentence, text, token = "sentences")
@@ -117,7 +123,6 @@ ggplot(trump_tweet_data_sentences, aes(x = isRetweet)) +
 ggplot(civiqs_poll_data,aes(x = rep_group)) +
   geom_bar()
 
-help ("initial_split")
 # create train and test 
 
 set.seed(1234)
@@ -203,7 +208,7 @@ civiqs_poll_data_train_pred %>%
 
 
 # make predictions for test data -----------------------------------------------
-
+'''
 civiqs_poll_data_fit <- covid_wflow %>%
   fit(data = civiqs_poll_data_train)
 
@@ -219,3 +224,4 @@ civiqs_poll_data_test_pred %>%
 
 civiqs_poll_data_test_pred %>% 
   filter(origin == "concerned", pred > 0.5)
+'''
