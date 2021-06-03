@@ -26,6 +26,7 @@ library(glmnet)
 
 # first we load the data, using the read functions
 
+
 civiqs_poll_data <- read.csv("civiqs_poll.csv")
 colnames(civiqs_poll_data)[1] <- "Date"
 civiqs_poll_data$Date <-as.Date(civiqs_poll_data$Date,format="%m/%d/%y")
@@ -39,9 +40,22 @@ trump_tweet_data$Date<- as.Date(trump_tweet_data$Date)
 df_wiki_filtered <- read.csv("df_wiki_numeric.csv")
 summmarised_stats <- read.csv("summarised_stats.csv") 
 
+#load csv of filtered wiki
+df_wiki_filtered <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/df_wiki_numeric.csv")
+df_wiki_filtered <- df_wiki_filtered[,2:ncol(df_wiki_filtered)]
+
+#load the summarised stats
+summarised_stats <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/summarised_stats.csv")
+summarised_stats <- summarised_stats[,2:ncol(summarised_stats)]
+
+
+filtered_summ <- summmarised_stats[12:52,]
+
 
 trump_tweet_data$length_text <-str_count(trump_tweet_data$text)
-# create table of tweet and civiqs_poll
+
+
+df_wiki_filtered$Date <-as.Date(df_wiki_filtered$Date,format="%d-%b-%y")
 
 
 civiqs_poll_and_tweets <-
@@ -75,6 +89,7 @@ civiqs_poll_data$rep_group <- case_when(civiqs_poll_data$rep <= 0 ~'Not concerne
              civiqs_poll_data$rep >= 0 ~ 'concerned')
 
 
+
  
 # civiqs_poll_data$rep == 0 ~ 'Unsure',
 # add number of tweet for the wiki
@@ -88,6 +103,7 @@ civiqs_poll_data$rep_group <- case_when(civiqs_poll_data$rep <= 0 ~'Not concerne
 #df_wiki_filtered_temp_change_row_col <- as.data.frame(t(df_wiki_filtered_temp))
 
 
+
 # the number of tweets in every date in the summarise 
 #tweet_and_summmarised_stats <- merge(summmarised_stats,trump_tweet_data,by = "Date")
 #tweet_and_summmarised_stats_by_date <- tweet_and_summmarised_stats %>%
@@ -95,6 +111,13 @@ civiqs_poll_data$rep_group <- case_when(civiqs_poll_data$rep <= 0 ~'Not concerne
 #  summarise(number_of_tweets =n())
 
 
+
+
+tweet_and_summmarised_stats_by_date <- tweet_and_summmarised_stats %>%
+  group_by(Date)%>%
+  summarise(number_of_tweets =n())
+tweet_and_summmarised_stats_by_date <-merge(tweet_and_summmarised_stats_by_date,summmarised_stats, by="Date")
+  
 
 
 df_governors <- read.csv("us-governors.csv")
