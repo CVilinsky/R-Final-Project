@@ -39,7 +39,7 @@ df_wiki_filtered <- read.csv("df_wiki_numeric.csv")
 summmarised_stats <- read.csv("summarised_stats.csv") 
 
 
-
+trump_tweet_data$length_text <-str_count(trump_tweet_data$text)
 # create table of tweet and civiqs_poll
 
 
@@ -48,7 +48,8 @@ civiqs_poll_and_tweets <-
 
 #civiqs_poll_data["text"] <- " "
 
-for (i in nrow(civiqs_poll_data)){
+for (i in 1:nrow(civiqs_poll_data)){
+  
   temp_long_tweet <- " "
   temp_date <- civiqs_poll_data$Date[i]
   temp_vec <- grepl(temp_date, trump_tweet_data$Date)
@@ -61,17 +62,14 @@ for (i in nrow(civiqs_poll_data)){
     temp_long_tweet <- paste(temp_long_tweet,
       trump_tweet_data$text[j])
     j <- j+1
-    print(temp_long_tweet)
   }
   civiqs_poll_data$text[i] <-temp_long_tweet 
 }
  
 
+civiqs_poll_data$length_text <-str_count(civiqs_poll_data$text)
 
-
-
-
-
+civiqs_poll_data$sum_rep_dem <- civiqs_poll_data$dem+civiqs_poll_data$rep
 
 
  
@@ -100,16 +98,14 @@ df_governors <- read.csv("us-governors.csv")
 df_governors <- df_governors %>% select(state_name,state_code,party)
 
 
-
-
+civiqs_poll_data_sentences <- civiqs_poll_data %>% 
+  select(Date,rep,dem,sum_rep_dem,text) %>%
+  unnest_tokens(sentence, text, token = "sentences")
+  
 
 # separate into sentences
 trump_tweet_data_sentences <- trump_tweet_data %>%
   unnest_tokens(sentence, text, token = "sentences")
-
-  
-  
-  
 
 # check the balance between retweet and nonretweet
 ggplot(trump_tweet_data_sentences, aes(x = isRetweet)) +
@@ -121,9 +117,9 @@ help ("initial_split")
 # create train and test 
 
 set.seed(1234)
-trump_tweet_data_split <- initial_split(trump_tweet_data_sentences,strata =isRetweet )
-trump_tweet_data_train <- training(trump_tweet_data_split)
-trump_tweet_data_test <- testing(trump_tweet_data_split)
+civiqs_poll_data_split <- initial_split(civiqs_poll_data_sentences,strata =isRetweet )
+civiqs_poll_data_train <- training(civiqs_poll_data_split)
+civiqs_poll_data_test <- testing(civiqs_poll_data_split)
 
 # specify model ----------------------------------------------------------------
 
@@ -134,7 +130,7 @@ lasso_mod <- logistic_reg(penalty = 0.005, mixture = 1) %>%
 
 # build recipe -----------------------------------------------------------------
 
-covid_rec <- recipe(isRetweet ~ sentence, data = trump_tweet_data_train) %>%
+covid_rec <- recipe(sum_rep_dem ~ sentence, data = civiqs_poll_data_train) %>%
   # tokenize into words
   step_tokenize(sentence, token = "words") %>%
   # filter out stop words
