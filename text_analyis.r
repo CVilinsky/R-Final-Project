@@ -1,4 +1,5 @@
 
+# load the libraries that we will use during the assignment
 
 library(tidyverse)
 library(tidymodels)
@@ -7,17 +8,11 @@ library(textrecipes)
 library(here)
 library(dplyr)
 library(stringr)
-
-
-# load the libraries that we will use during the assignment
-
 library(ggplot2)
 library(tidyr)
-library(dplyr)
 library(robotstxt)
 library(rvest)
 library(glue)
-library(tidyverse) 
 library(lubridate)
 library(gridExtra)
 library(scales)
@@ -53,8 +48,6 @@ filtered_summ <- summmarised_stats[12:52,]
 
 
 trump_tweet_data$length_text <-str_count(trump_tweet_data$text)
-
-
 df_wiki_filtered$Date <-as.Date(df_wiki_filtered$Date,format="%d-%b-%y")
 
 
@@ -162,7 +155,7 @@ lasso_mod <- logistic_reg(penalty = 0.005, mixture = 1) %>%
 
 # build recipe -----------------------------------------------------------------
 
-covid_rec <- recipe(rep_group ~ sentence, data = civiqs_poll_data_train) %>%
+civiqs_poll_rec <- recipe(rep_group ~ sentence, data = civiqs_poll_data_train) %>%
   # tokenize into words
   step_tokenize(sentence, token = "words") %>%
   # filter out stop words
@@ -179,9 +172,9 @@ covid_rec <- recipe(rep_group ~ sentence, data = civiqs_poll_data_train) %>%
 
 # build workflow ---------------------------------------------------------------
 
-covid_wflow <- workflow() %>%
+civiqs_poll_wflow <- workflow() %>%
   add_model(lasso_mod) %>%
-  add_recipe(covid_rec)
+  add_recipe(civiqs_poll_rec)
 
 
 #cv ---------------------------------------------------------------------------
@@ -194,7 +187,7 @@ civiqs_poll_data_folds <- read_rds("civiqs_poll_data_folds.rds")
 
 # fit resamples ----------------------------------------------------------------
 
-civiqs_poll_data_fit_rs <- covid_wflow %>%
+civiqs_poll_data_fit_rs <- civiqs_poll_wflow %>%
  fit_resamples(
    civiqs_poll_data_folds,
    control = control_resamples(save_pred = TRUE)
@@ -214,7 +207,7 @@ civiqs_poll_data_train_pred %>%
   roc_curve(truth = rep_group, `.pred_Not concerned`) %>%
   autoplot() +
   labs(
-    title = "ROC curve for Scotland & UK COVID speeches",
+    title = "ROC curve for concerned & Not concerned ",
     subtitle = "Each resample fold is shown in a different color"
   )
 
@@ -231,7 +224,7 @@ civiqs_poll_data_train_pred %>%
 
 
 # make predictions for test data -----------------------------------------------
-'''
+
 civiqs_poll_data_fit <- covid_wflow %>%
   fit(data = civiqs_poll_data_train)
 
@@ -239,12 +232,131 @@ civiqs_poll_data_test_pred <- predict(civiqs_poll_data_fit, new_data = civiqs_po
   bind_cols(civiqs_poll_data_test %>% select(rep_group, Date, sentence))
 
 civiqs_poll_data_test_pred %>%
-  roc_curve(truth = rep_group, .pred_concerned) %>%
+  roc_curve(truth = factor(rep_group), .pred_concerned) %>%
   autoplot()
 
 civiqs_poll_data_test_pred %>%
-  roc_auc(truth = rep_group, .pred_concerned)
+  roc_auc(truth = factor(rep_group), .pred_concerned)
 
-civiqs_poll_data_test_pred %>% 
-  filter(origin == "concerned", pred > 0.5)
-'''
+new <- civiqs_poll_data_test_pred %>% 
+  filter(rep_group == "concerned", `.pred_Not concerned` > 0.5)
+
+
+
+# tune -------------------------------------------------------------------------
+
+# specify model 
+
+lasso_mod_tune <- logistic_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet") %>% 
+  set_mode("classification")
+
+
+
+
+# build recipe 
+
+civiqs_poll_rec_tune <- recipe(rep_group ~ sentence, data = civiqs_poll_data_train) %>%
+  step_tokenize(sentence, token = "words") %>%
+  step_stopwords(sentence) %>%
+  step_ngram(sentence, num_tokens = 3, min_num_tokens = 1) %>%
+  # keep the ?? most frequent words to avoid creating too many variables 
+  step_tokenfilter(sentence, max_tokens = tune(), min_times = 5) %>%
+  step_tfidf(sentence)
+
+# build workflow 
+
+civiqs_poll_wflow_tune <- workflow() %>%
+  add_model(lasso_mod_tune) %>%
+  add_recipe(civiqs_poll_rec_tune)
+
+
+
+
+# grid of possible hyperparameters
+
+param_grid <- grid_regular(
+  penalty(range = c(-7, 0)),
+  max_tokens(range = c(50, 500)),
+  levels = 10
+)
+
+
+
+# train models with all possible values of tuning parameters
+set.seed(24)
+civiqs_poll_data_fit_rs_tune <- tune_grid(
+  civiqs_poll_wflow_tune,
+  resamples = civiqs_poll_data_folds,
+  grid = param_grid, 
+  control = control_grid(save_pred = TRUE)
+)
+write_rds(civiqs_poll_data_fit_rs_tune, "civiqs_poll_data_fit_rs_tune.rds", compress = "bz2")
+
+
+civiqs_poll_data_fit_rs_tune <- read_rds("civiqs_poll_data_fit_rs_tune.rds")
+mat <- collect_metrics(civiqs_poll_data_fit_rs_tune)
+autoplot(civiqs_poll_data_fit_rs_tune)
+civiqs_poll_data_fit_rs_tune %>%
+  show_best("roc_auc")
+best_roc_auc <- select_best(civiqs_poll_data_fit_rs_tune, "roc_auc")
+
+# evaluate best model ----------------------------------------------------------
+
+collect_predictions(civiqs_poll_data_fit_rs_tune, parameters = best_roc_auc) %>%
+  group_by(id) %>%
+  roc_curve(truth = rep_group,.pred_concerned ) %>%
+  autoplot() +
+  labs(
+    title = "ROC curve for Scotland & UK COVID speeches",
+    subtitle = "Each resample fold is shown in a different color"
+  )
+civiqs_poll_wflow_final <- finalize_workflow(civiqs_poll_wflow_tune, best_roc_auc)
+
+
+library(vip)
+
+
+vi_data <- civiqs_poll_wflow_final %>%
+  fit(civiqs_poll_data_train) %>%
+  pull_workflow_fit() %>%
+  vi(lambda = best_roc_auc$penalty) %>%
+  mutate(Variable = str_remove_all(Variable, "tfidf_sentence_")) %>%
+  filter(Importance != 0)
+ 
+write_rds(vi_data, "vi_data.rds", compress = "xz")
+vi_data <- read_rds("vi_data.rds")
+
+
+
+vi_data %>%
+  mutate(
+    Importance = abs(Importance)
+  ) %>%
+  filter(Importance != 0) %>%
+  group_by(Sign) %>%
+  slice_head(n = 10) %>%
+  ungroup() %>%
+  mutate(pred_origin = if_else(Sign == "POS" ,"concerned","Not concerned")) %>% 
+  ggplot(aes(
+    x = Importance,
+    y = fct_reorder(Variable, Importance),
+    fill = pred_origin
+  )) +
+  geom_col(show.legend = FALSE) +
+  scale_x_continuous(expand = c(0, 0)) +
+  #scale_fill_manual(values = c(scotblue, ukred)) +
+  facet_wrap(~pred_origin, scales = "free") +
+  labs(
+    y = NULL
+  )
+
+
+
+
+
+
+
+
+
+
