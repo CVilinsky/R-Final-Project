@@ -139,7 +139,9 @@ ggplot(trump_tweet_data_sentences, aes(x = isRetweet)) +
 
 ggplot(civiqs_poll_data,aes(x = rep_group)) +
   geom_bar()+
-  labs(title = "the amount of concerned and Not concerned Classification")
+  labs(title = "Concernen level in the beging of the pandamic",
+       subtitle = "See the proportion between the cocerne level in the Republican party supporters",
+       y="Number of Days with the concern level", x="")
 
 # create train and test 
 
