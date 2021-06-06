@@ -36,12 +36,12 @@ df_wiki_filtered <- read.csv("df_wiki_numeric.csv")
 summmarised_stats <- read.csv("summarised_stats.csv") 
 
 #load csv of filtered wiki
-df_wiki_filtered <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/df_wiki_numeric.csv")
-df_wiki_filtered <- df_wiki_filtered[,2:ncol(df_wiki_filtered)]
+#df_wiki_filtered <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/df_wiki_numeric.csv")
+#df_wiki_filtered <- df_wiki_filtered[,2:ncol(df_wiki_filtered)]
 
 #load the summarised stats
-summarised_stats <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/summarised_stats.csv")
-summarised_stats <- summarised_stats[,2:ncol(summarised_stats)]
+#summarised_stats <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/summarised_stats.csv")
+#summarised_stats <- summarised_stats[,2:ncol(summarised_stats)]
 
 
 filtered_summ <- summmarised_stats[12:52,]
@@ -98,7 +98,7 @@ civiqs_poll_data$rep_group <- case_when(civiqs_poll_data$rep <= 0 ~'Not concerne
 
 
 # the number of tweets in every date in the summarise 
-#tweet_and_summmarised_stats <- merge(summmarised_stats,trump_tweet_data,by = "Date")
+tweet_and_summmarised_stats <- merge(summmarised_stats,trump_tweet_data,by = "Date")
 #tweet_and_summmarised_stats_by_date <- tweet_and_summmarised_stats %>%
 #  group_by(Date)%>%
 #  summarise(number_of_tweets =n())
@@ -134,10 +134,12 @@ trump_tweet_data_sentences <- trump_tweet_data %>%
 
 # check the balance between retweet and nonretweet
 ggplot(trump_tweet_data_sentences, aes(x = isRetweet)) +
-  geom_bar()
+  geom_bar()+
+  labs(title = "the amount of tweet and retweet by trump")
 
 ggplot(civiqs_poll_data,aes(x = rep_group)) +
-  geom_bar()
+  geom_bar()+
+  labs(title = "the amount of concerned and Not concerned Classification")
 
 # create train and test 
 
@@ -178,15 +180,16 @@ civiqs_poll_wflow <- workflow() %>%
 
 
 #cv ---------------------------------------------------------------------------
-
+'''
 set.seed(1234)
 civiqs_poll_data_folds <- vfold_cv(civiqs_poll_data_train, v = 10, strata = rep_group)
 write_rds(civiqs_poll_data_folds, "civiqs_poll_data_folds.rds", compress = "bz2")
+'''
 civiqs_poll_data_folds <- read_rds("civiqs_poll_data_folds.rds")
 
 
 # fit resamples ----------------------------------------------------------------
-
+'''
 civiqs_poll_data_fit_rs <- civiqs_poll_wflow %>%
  fit_resamples(
    civiqs_poll_data_folds,
@@ -194,6 +197,7 @@ civiqs_poll_data_fit_rs <- civiqs_poll_wflow %>%
  )
 
 write_rds(civiqs_poll_data_fit_rs, "civiqs_poll_data_fit_rs.rds", compress = "xz")
+'''
 civiqs_poll_data_fit_rs <- read_rds("civiqs_poll_data_fit_rs.rds")
 
 
@@ -204,19 +208,10 @@ civiqs_poll_data_train_pred <- collect_predictions(civiqs_poll_data_fit_rs)
 
 civiqs_poll_data_train_pred %>%
   group_by(id) %>%
-  roc_curve(truth = rep_group, `.pred_Not concerned`) %>%
-  autoplot() +
-  labs(
-    title = "ROC curve for concerned & Not concerned ",
-    subtitle = "Each resample fold is shown in a different color"
-  )
-
-civiqs_poll_data_train_pred %>%
-  group_by(id) %>%
   roc_curve(truth = rep_group, .pred_concerned) %>%
   autoplot() +
   labs(
-    title = "ROC curve for Scotland & UK COVID speeches",
+    title = "ROC curve for concerned & Not concerned level",
     subtitle = "Each resample fold is shown in a different color"
   )
 
@@ -225,7 +220,7 @@ civiqs_poll_data_train_pred %>%
 
 # make predictions for test data -----------------------------------------------
 
-civiqs_poll_data_fit <- covid_wflow %>%
+civiqs_poll_data_fit <- civiqs_poll_wflow %>%
   fit(data = civiqs_poll_data_train)
 
 civiqs_poll_data_test_pred <- predict(civiqs_poll_data_fit, new_data = civiqs_poll_data_test, type = "prob") %>%
@@ -238,7 +233,7 @@ civiqs_poll_data_test_pred %>%
 civiqs_poll_data_test_pred %>%
   roc_auc(truth = factor(rep_group), .pred_concerned)
 
-new <- civiqs_poll_data_test_pred %>% 
+Errors_in_the_model <- civiqs_poll_data_test_pred %>% 
   filter(rep_group == "concerned", `.pred_Not concerned` > 0.5)
 
 
@@ -282,7 +277,7 @@ param_grid <- grid_regular(
 )
 
 
-
+'''
 # train models with all possible values of tuning parameters
 set.seed(24)
 civiqs_poll_data_fit_rs_tune <- tune_grid(
@@ -292,7 +287,7 @@ civiqs_poll_data_fit_rs_tune <- tune_grid(
   control = control_grid(save_pred = TRUE)
 )
 write_rds(civiqs_poll_data_fit_rs_tune, "civiqs_poll_data_fit_rs_tune.rds", compress = "bz2")
-
+'''
 
 civiqs_poll_data_fit_rs_tune <- read_rds("civiqs_poll_data_fit_rs_tune.rds")
 mat <- collect_metrics(civiqs_poll_data_fit_rs_tune)
@@ -308,7 +303,7 @@ collect_predictions(civiqs_poll_data_fit_rs_tune, parameters = best_roc_auc) %>%
   roc_curve(truth = rep_group,.pred_concerned ) %>%
   autoplot() +
   labs(
-    title = "ROC curve for Scotland & UK COVID speeches",
+    title = "ROC curve for concerned & Not concerned level",
     subtitle = "Each resample fold is shown in a different color"
   )
 civiqs_poll_wflow_final <- finalize_workflow(civiqs_poll_wflow_tune, best_roc_auc)
@@ -316,7 +311,7 @@ civiqs_poll_wflow_final <- finalize_workflow(civiqs_poll_wflow_tune, best_roc_au
 
 library(vip)
 
-
+'''
 vi_data <- civiqs_poll_wflow_final %>%
   fit(civiqs_poll_data_train) %>%
   pull_workflow_fit() %>%
@@ -325,6 +320,7 @@ vi_data <- civiqs_poll_wflow_final %>%
   filter(Importance != 0)
  
 write_rds(vi_data, "vi_data.rds", compress = "xz")
+'''
 vi_data <- read_rds("vi_data.rds")
 
 
