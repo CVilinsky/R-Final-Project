@@ -32,23 +32,18 @@ colnames(trump_tweet_data)[2] <- "Date"
 trump_tweet_data$Date<-substr(trump_tweet_data$Date,1,10)
 trump_tweet_data$Date<- as.Date(trump_tweet_data$Date)
 
-df_wiki_filtered <- read.csv("df_wiki_numeric.csv")
-summmarised_stats <- read.csv("summarised_stats.csv") 
-
 #load csv of filtered wiki
-#df_wiki_filtered <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/df_wiki_numeric.csv")
-#df_wiki_filtered <- df_wiki_filtered[,2:ncol(df_wiki_filtered)]
+df_wiki_filtered <- read.csv("df_wiki_numeric.csv")
+df_wiki_filtered <- df_wiki_filtered[,2:ncol(df_wiki_filtered)]
 
 #load the summarised stats
-#summarised_stats <- read.csv("C:/Users/vilin/Desktop/University/Year 2/Advanced Programing/R_FinalProj_new_TRY/summarised_stats.csv")
-#summarised_stats <- summarised_stats[,2:ncol(summarised_stats)]
-
+summmarised_stats <- read.csv("summarised_stats.csv") 
+summarised_stats <- summarised_stats[,2:ncol(summarised_stats)]
 
 filtered_summ <- summmarised_stats[12:52,]
 
-
 trump_tweet_data$length_text <-str_count(trump_tweet_data$text)
-df_wiki_filtered$Date <-as.Date(df_wiki_filtered$Date,format="%d-%b-%y")
+df_wiki_filtered$Date <-ymd(df_wiki_filtered$Date)
 
 
 civiqs_poll_and_tweets <-
