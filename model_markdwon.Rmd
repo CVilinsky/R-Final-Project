@@ -1,0 +1,260 @@
+---
+title: "model"
+author: "guy kiper"
+date: "6/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r message=FALSE}
+library(tidymodels)
+library(tidytext)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(rvest)
+library(stringr)
+library(lubridate)
+library(readr)
+```
+ 
+#### download data ,changing in the formats , adding information
+```{r}
+
+civiqs_poll_data <- read.csv("civiqs_poll.csv")
+colnames(civiqs_poll_data)[1] <- "Date"
+civiqs_poll_data$Date <-as.Date(civiqs_poll_data$Date,format="%m/%d/%y")
+head(civiqs_poll_data)
+
+```
+
+
+
+```{r}
+trump_tweet_data <- readRDS("trump.rds") %>%
+  rownames_to_column(var = "speech_id")
+colnames(trump_tweet_data)[2] <- "Date"
+trump_tweet_data$Date<-substr(trump_tweet_data$Date,1,10)
+trump_tweet_data$Date<- as.Date(trump_tweet_data$Date)
+trump_tweet_data$length_text <-str_count(trump_tweet_data$text)
+head(trump_tweet_data)
+```
+
+
+```{r}
+speech_join_rep <- inner_join(trump_tweet_data,civiqs_poll_data ,by ="Date" )
+speech_join_rep<-speech_join_rep %>% select(Date,speech_id,rep)
+speech_join_rep$speech_id <- as.numeric(as.character(speech_join_rep$speech_id))
+head(speech_join_rep)
+
+```
+
+
+
+```{r }
+
+
+# separate into sentences
+trump_tweet_data_sentences <- trump_tweet_data %>%
+  unnest_tokens(sentence, text, token = "sentences")
+
+# check the balance between retweet and nonretweet
+ggplot(trump_tweet_data_sentences, aes(x = isRetweet,fill  = isRetweet)) +
+  geom_bar()+
+  labs(title = "the amount of tweet and retweet by trump",
+       x = NULL ,y = NULL)
+
+```
+
+
+Explanation:
+
+we can see from the gragh that there isnt a big diffrent between the amount retweet and tweet by trump
+
+
+
+
+```{r }
+
+trump_tweet_data_word <-trump_tweet_data %>%
+  rowwise()%>%
+  mutate(sum_words = text %>% str_count("\\w+")%>% sum()) %>%
+  ungroup() %>%
+  unnest_tweets(word,text)
+
+```
+
+
+```{r}
+head(trump_tweet_data_word)
+```
+
+
+```{r}
+
+
+
+
+
+ggplot(trump_tweet_data_word,aes(x=sum_words,fill = isRetweet))+
+  geom_bar()+
+  facet_grid(isRetweet~.,scales = "free")+
+  labs(title = "the amount of word when trump tweet and retweet",
+       x = NULL , y = NULL)
+
+
+```
+
+Explanation:
+
+we can see that there is a diffrent between the amount of words
+when trump tweets and retweets, when trump tweet the sum of the tweet
+is larger the in a retweet .
+
+
+
+```{r }
+trump_top_500_ngrams <- trump_tweet_data %>% 
+  unnest_tokens(n_grams, text, token = "ngrams", n = 3, n_min = 1) %>% 
+  anti_join(stop_words, by = c("n_grams" = "word")) %>%    # drop rows with stop words
+  group_by(n_grams) %>%    # group by bigram index
+  summarise(n_grams = unique(n_grams), n = n(), .groups = "drop") %>% 
+  arrange(desc(n)) %>% 
+  rowid_to_column(var = "id") %>% 
+  filter(id<=200) %>%
+print(0)  
+trump_top_500_ngrams<- trump_top_500_ngrams[-grep('rt',trump_top_500_ngrams$n_grams),]
+trump_top_500_ngrams<- trump_top_500_ngrams[-grep('https',trump_top_500_ngrams$n_grams),]
+trump_top_500_ngrams<- trump_top_500_ngrams[-grep('t.co',trump_top_500_ngrams$n_grams),]
+
+```
+
+```{r}
+head(trump_top_500_ngrams)
+```
+
+
+
+```{r include=FALSE}
+
+
+trump_tweets_tf_idf_wide <- trump_tweet_data %>% 
+  unnest_tokens(n_grams, text, token = "ngrams", n = 3, n_min = 1, drop = FALSE) %>% 
+  anti_join(stop_words, by = c("n_grams" = "word")) %>% 
+  group_by(speech_id, n_grams) %>% 
+  summarise(n = n()) %>% 
+  bind_tf_idf(n_grams,document = speech_id, n = n) %>% 
+  filter(n_grams %in% trump_top_500_ngrams$n_grams) %>% 
+  pivot_wider(id_cols = speech_id,
+              names_from = n_grams,
+              values_from = tf_idf,
+              values_fill = 0)
+trump_tweets_tf_idf_wide$speech_id <- as.numeric(as.character(trump_tweets_tf_idf_wide$speech_id))
+
+trump_tweets_tf_idf_wide<-
+  cbind(trump_tweets_tf_idf_wide, total = rowSums(trump_tweets_tf_idf_wide)-trump_tweets_tf_idf_wide$speech_id)
+
+```
+
+
+
+
+
+```{r}
+
+
+trump_tweet_sum_td_idf <- trump_tweets_tf_idf_wide %>% select(speech_id,total)
+rep_tf_idf <- inner_join(trump_tweet_sum_td_idf ,speech_join_rep, by = "speech_id")
+head(rep_tf_idf)
+
+```
+
+
+```{r}
+
+trump_tweets_tf_idf_long <- trump_tweet_data %>% 
+  unnest_tokens(n_grams, text, token = "ngrams", n = 3, n_min = 1, drop = FALSE) %>% 
+  anti_join(stop_words, by = c("n_grams" = "word")) %>% 
+  group_by(speech_id, n_grams) %>% 
+  summarise(n = n()) %>% 
+  bind_tf_idf(n_grams,document = speech_id, n = n) %>% 
+  filter(n_grams %in% trump_top_500_ngrams$n_grams) 
+
+head(trump_tweets_tf_idf_long)
+
+```
+
+
+
+```{r}
+ggplot(rep_tf_idf, aes(x = total, y = rep,size = total)) +
+  geom_point(aes (color = rep , alpha = 0.7)) +
+  geom_smooth(method = "lm", formula = y ~ x)+
+  labs(title = " the republican concern level vs sum of tf_idf tweet",
+       x = "sum of tf_idf tweet",
+       y = " republican concern level")+
+  guides(alpha = FALSE ,smooth = FALSE)
+
+```
+
+
+```{r}
+cor(rep_tf_idf$total,rep_tf_idf$rep)
+
+```
+
+```{r}
+
+set.seed(1234)
+cov_split <- initial_split(rep_tf_idf )
+cov_train <- training(cov_split)
+cov_test <- testing(cov_split)
+```
+
+```{r}
+
+cov_mod <- linear_reg()%>%
+  set_engine("lm") 
+```
+
+```{r}
+cov_rec <- recipe(rep ~ total,data=cov_train) 
+
+```
+
+```{r}
+cov_wflow <- workflow() %>%
+  add_model(cov_mod) %>%
+  add_recipe(cov_rec)
+
+```
+
+```{r}
+set.seed(1234)
+cov_folds <- vfold_cv(cov_train, v = 3)
+write_rds(cov_folds, "cov_folds.rds", compress = "bz2")
+
+civiqs_poll_data_folds <- read_rds("cov_folds.rds")
+
+```
+
+```{r}
+cov_fit_rs <- cov_wflow %>%
+  fit_resamples(
+    cov_folds,
+    control = control_resamples(save_pred = TRUE)
+  )
+```
+
+```{r}
+
+
+collect_metrics(cov_fit_rs)
+collect_predictions(cov_fit_rs)
+
+```
+
