@@ -18,7 +18,6 @@ library(gridExtra)
 library(scales)
 library(grid)
 library(glmnet)
-
 # first we load the data, using the read functions
 
 
@@ -38,7 +37,8 @@ df_wiki_filtered <- df_wiki_filtered[,2:ncol(df_wiki_filtered)]
 
 #load the summarised stats
 summmarised_stats <- read.csv("summarised_stats.csv") 
-summarised_stats <- summarised_stats[,2:ncol(summarised_stats)]
+summmarised_stats <- summmarised_stats[,2:ncol(summmarised_stats)]
+summmarised_stats$Date <-ymd(summmarised_stats$Date)
 
 filtered_summ <- summmarised_stats[12:52,]
 
@@ -129,14 +129,14 @@ trump_tweet_data_sentences <- trump_tweet_data %>%
 
 # check the balance between retweet and nonretweet
 ggplot(trump_tweet_data_sentences, aes(x = isRetweet)) +
-  geom_bar()+
-  labs(title = "the amount of tweet and retweet by trump")
+  geom_bar(aes(fill=isRetweet))+theme(legend.position="none",plot.title = element_text(size=22))+
+  labs(title = "The Amount of Tweets and Retweets by Trump",y="Number Of Tweets")
 
 ggplot(civiqs_poll_data,aes(x = rep_group)) +
-  geom_bar()+
+  geom_bar(aes(fill=rep_group))+theme(legend.position="none")+
   labs(title = "Concernen level in the beging of the pandamic",
        subtitle = "See the proportion between the cocerne level in the Republican party supporters",
-       y="Number of Days with the concern level", x="")
+       y="Number of Days with the concern level")+xlab(NULL)+theme(plot.title = element_text(size=22), plot.subtitle = element_text(size=12))
 
 # create train and test 
 
