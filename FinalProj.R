@@ -77,17 +77,12 @@ summmarised_stats[,i] <- as.numeric(summmarised_stats[,i])}
 write.csv(summmarised_stats,"summarised_stats.csv")
 
 
-civiqs_poll_data$summed <- civiqs_poll_data$dem+civiqs_poll_data$rep
+civiqs_poll_data$sum_rep_dem <- civiqs_poll_data$dem+civiqs_poll_data$rep
 colnames(civiqs_poll_data)[1] <- "Date"
 civiqs_poll_data$Date <- as.Date(civiqs_poll_data$Date,format="%m/%d/%Y")
 
 write.csv(civiqs_poll_data, "poll_with_sum.csv")
 #plots active vs voters
-
-plot_active_cases_dates <- ggplot(filtered_summ,mapping = aes(x=Date,y=Active))+labs(title='Active Case',subtitle = 'In the begining of the pandamic')+geom_line()+scale_y_continuous(trans=log2_trans(), breaks = trans_breaks("log2", function(x) 2^x),
-                                                                                             labels = trans_format("log2", math_format(2^.x)))
-plot_polls_dates <- ggplot(civiqs_poll_data,aes(x=Date,y=summed))+geom_line()+labs(title='Concern Level',y='Level',x='Date')
-grid.arrange(plot_active_cases_dates,plot_polls_dates,top=textGrob("The effect of active cases on the concern of the citizens",gp=gpar(fontsize=15,font=2)))
 
 #iterate the columns, and remove the commas for the values and turn the columns to numeric
 for (i in 2:ncol(summmarised_stats)){summmarised_stats[,i] <- replaceCommas(summmarised_stats[,i])
